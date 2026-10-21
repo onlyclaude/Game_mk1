@@ -49,8 +49,25 @@ async function startGame(page, name) {
   await act(page, 'new-game').click();
   await page.waitForSelector('[data-screen="newGame"]');
   await page.fill('#player-name', name);
+  await page.click('[data-origin="bureau"]');
+  await page.click('[data-trait="sharp_eye"]');
+  await page.click('[data-trait="lucky"]');
   await act(page, 'start').click();
   await page.waitForSelector('[data-screen="hub"]');
+  await page.waitForTimeout(300); // 화면 전환 직후 터치 잠금 시간
+}
+
+// 사건 하나를 끝까지 진행: 고를 수 있는 첫 선택지 → 결과 → 계속
+async function playOneEvent(page) {
+  await act(page, 'next-event').click();
+  await page.waitForSelector('[data-screen="event"]');
+  await page.waitForTimeout(300);
+  await page.locator('.choice:not([disabled])').first().click();
+  await page.waitForSelector('[data-action="continue-event"]', { timeout: 5000 });
+  await page.waitForTimeout(300);
+  await act(page, 'continue-event').click();
+  await page.waitForSelector('[data-screen="hub"]');
+  await page.waitForTimeout(300);
 }
 
 // --- 기능 테스트 ---
@@ -150,6 +167,93 @@ await check('저장 데이터 초기화는 확인 후에만 삭제', async () =>
   await page.context().close();
 });
 
+await check('캐릭터 생성: 출신·특성을 고르기 전에는 시작할 수 없고, 선택이 능력치에 반영된다', async () => {
+  const page = await newPage();
+  await act(page, 'new-game').click();
+  await page.waitForSelector('[data-screen="newGame"]');
+  assert(await act(page, 'start').isDisabled(), '선택 전인데 시작 가능');
+  await page.click('[data-origin="underdeck"]');
+  await page.waitForTimeout(300);
+  await page.click('[data-trait="sturdy"]');
+  await page.waitForTimeout(300);
+  await page.click('[data-trait="charming"]');
+  await page.waitForTimeout(300);
+  assert(await page.locator('[data-trait="lucky"]').isDisabled(), '3번째 특성이 선택 가능');
+  await page.click('[data-inc="body"]');
+  await page.waitForTimeout(300);
+  assert(!(await act(page, 'start').isDisabled()), '선택 후에도 시작 불가');
+  await act(page, 'start').click();
+  await page.waitForSelector('[data-screen="hub"]');
+  const body = await page.textContent('[data-stat="body"]');
+  assert(body === '6', `신체 기대값 6(기본3+출신1+특성1+추가1), 실제 ${body}`);
+  assert(page.errors.length === 0, '콘솔 오류: ' + page.errors.join(' | '));
+  await page.context().close();
+});
+
+await check('사건 진행: 선택 → 주사위 판정 → 결과 → 거점 복귀, 인물 등록', async () => {
+  const page = await newPage();
+  await startGame(page, '사건');
+  await act(page, 'next-event').click();
+  await page.waitForSelector('[data-screen="event"]');
+  assert((await page.textContent('.event-title')).includes('봉쇄선 점검'), '첫 사건이 아님');
+  assert(await page.locator('.cast').count() === 2, '인물 초상화 2개가 아님');
+  assert((await page.textContent('[data-choice="observe"]')).includes('성공'), '확률 표시 없음');
+  await page.waitForTimeout(300);
+  await page.click('[data-choice="observe"]');
+  await page.waitForSelector('[data-outcome]', { timeout: 5000 });
+  const outcome = await page.getAttribute('[data-outcome]', 'data-outcome');
+  assert(['critical', 'success', 'partial', 'fail', 'fumble'].includes(outcome), '판정 결과 없음');
+  assert(await page.locator('.choice').count() === 0, '결과 화면에 선택지가 남음');
+  await page.waitForTimeout(300);
+  await act(page, 'continue-event').click();
+  await page.waitForSelector('[data-screen="hub"]');
+  assert(await page.locator('[data-person="lien"]').count() === 1, '리엔이 인물 목록에 없음');
+  await page.waitForTimeout(300);
+  await page.click('[data-person="lien"]');
+  assert((await page.textContent('.modal')).includes('측량사'), '인물 상세 없음');
+  assert(page.errors.length === 0, '콘솔 오류: ' + page.errors.join(' | '));
+  await page.context().close();
+});
+
+await check('사건 도중 새로고침해도 같은 사건이 이어진다', async () => {
+  const page = await newPage();
+  await startGame(page, '재개');
+  await act(page, 'next-event').click();
+  await page.waitForSelector('[data-screen="event"]');
+  const title = await page.textContent('.event-title');
+  await page.reload();
+  await page.waitForSelector('[data-screen="title"]');
+  await act(page, 'continue').click();
+  await page.waitForSelector('[data-screen="hub"]');
+  assert((await act(page, 'next-event').textContent()).includes('계속'), '진행 중 사건 표시 없음');
+  await page.waitForTimeout(300);
+  await act(page, 'next-event').click();
+  await page.waitForSelector('[data-screen="event"]');
+  assert(await page.textContent('.event-title') === title, '다른 사건이 나옴');
+  await page.context().close();
+});
+
+await check('여러 사건 연속 진행 후 연차가 넘어간다 (진행 막힘 없음)', async () => {
+  const page = await newPage();
+  await page.evaluate(() => localStorage.setItem('gc.settings', JSON.stringify({ fontScale: 1, animSpeed: 0.01 })));
+  await page.reload();
+  await page.waitForSelector('[data-screen="title"]');
+  await startGame(page, '연속');
+  for (let i = 0; i < 5; i++) await playOneEvent(page);
+  const year = await page.evaluate(() => JSON.parse(localStorage.getItem('gc.save')).progress.year);
+  assert(year === 2, `연차 기대값 2, 실제 ${year}`);
+  assert(page.errors.length === 0, '콘솔 오류: ' + page.errors.join(' | '));
+  await page.context().close();
+});
+
+await check('도움말에 판정 규칙이 표시된다', async () => {
+  const page = await newPage();
+  await act(page, 'help').click();
+  const text = await page.textContent('.modal');
+  assert(text.includes('부분 성공') && text.includes('대성공') && text.includes('운'), '판정 규칙 없음');
+  await page.context().close();
+});
+
 // --- 화면 크기 테스트 ---
 const VIEWPORTS = [
   ['iPad 세로', { width: 820, height: 1180 }],
@@ -181,6 +285,14 @@ for (const [label, vp] of VIEWPORTS) {
     await layoutCheck(page, '타이틀');
     await page.waitForTimeout(400); // 화면 전환 애니메이션 종료 대기
     await page.screenshot({ path: `${OUT}/title-${vp.width}x${vp.height}.png` });
+    await act(page, 'new-game').click();
+    await page.waitForSelector('[data-screen="newGame"]');
+    await layoutCheck(page, '캐릭터 생성');
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${OUT}/create-${vp.width}x${vp.height}.png` });
+    await act(page, 'back').click();
+    await page.waitForSelector('[data-screen="title"]');
+    await page.waitForTimeout(300);
     await startGame(page, '화면테스트');
     await layoutCheck(page, '거점');
     // 스크롤 영역 안의 모든 버튼에 실제로 터치가 닿는지 확인
@@ -190,6 +302,14 @@ for (const [label, vp] of VIEWPORTS) {
     }
     await page.waitForTimeout(400); // 화면 전환 애니메이션 종료 대기
     await page.screenshot({ path: `${OUT}/hub-${vp.width}x${vp.height}.png` });
+    await act(page, 'next-event').click();
+    await page.waitForSelector('[data-screen="event"]');
+    await layoutCheck(page, '사건');
+    const last = page.locator('.choice').last();
+    await last.scrollIntoViewIfNeeded();
+    await last.tap({ trial: true });
+    await page.waitForTimeout(700);
+    await page.screenshot({ path: `${OUT}/event-${vp.width}x${vp.height}.png` });
     await page.context().close();
   });
 }

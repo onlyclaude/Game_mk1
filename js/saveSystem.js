@@ -25,7 +25,24 @@ function defaultStorage() {
 
 // 버전별 변환 함수. migrations[n]은 버전 n 데이터를 n+1로 바꾼다.
 const migrations = {
-  // 예: 1: (d) => { d.newField = ...; d.saveVersion = 2; return d; },
+  // v1 → v2: 사건 진행용 필드와 주인공 외형 추가
+  1: (d) => {
+    d.player.look ??= 'a';
+    d.player.origin ??= null;
+    d.player.traits ??= [];
+    Object.assign(d.progress, {
+      yearStep: d.progress.yearStep ?? 0,
+      lastEventId: d.progress.lastEventId ?? null,
+      queue: d.progress.queue ?? [],
+      log: d.progress.log ?? [],
+      completedEvents: d.progress.completedEvents ?? [],
+      flags: d.progress.flags ?? {},
+    });
+    d.relations ??= {};
+    d.orgs ??= {};
+    d.saveVersion = 2;
+    return d;
+  },
 };
 
 export function migrate(data) {
@@ -61,6 +78,12 @@ export function validateSave(d) {
   else {
     if (!Number.isInteger(d.progress.year)) errors.push('progress.year 오류');
     if (!Array.isArray(d.progress.choices)) errors.push('progress.choices 오류');
+    if (d.saveVersion >= 2) {
+      if (!Array.isArray(d.progress.queue)) errors.push('progress.queue 오류');
+      if (!Array.isArray(d.progress.completedEvents)) errors.push('progress.completedEvents 오류');
+      if (!isObj(d.progress.flags)) errors.push('progress.flags 오류');
+      if (!isObj(d.relations)) errors.push('relations 오류');
+    }
   }
   if (!isObj(d.resources)) errors.push('resources 없음');
   return errors;

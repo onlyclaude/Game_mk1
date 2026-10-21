@@ -67,3 +67,18 @@ test('설정: 잘못된 값은 기본값으로 대체', () => {
   assert.equal(s.animSpeed, 0.5);
   assert.deepEqual(save.loadSettings(memoryStorage({ [save.KEYS.settings]: 'oops' })), save.DEFAULT_SETTINGS);
 });
+
+test('v1 저장 데이터는 v2로 변환되어 불러와진다', () => {
+  const v1 = createNewState({ name: '옛날' });
+  v1.saveVersion = 1;
+  delete v1.progress.queue;
+  delete v1.progress.log;
+  delete v1.progress.yearStep;
+  delete v1.player.look;
+  const r = save.parseSave(JSON.stringify(v1));
+  assert.equal(r.status, 'ok');
+  assert.equal(r.state.saveVersion, SAVE_VERSION);
+  assert.deepEqual(r.state.progress.queue, []);
+  assert.equal(r.state.progress.yearStep, 0);
+  assert.equal(r.state.player.look, 'a');
+});

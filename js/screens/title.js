@@ -1,9 +1,10 @@
 // 시작 화면
-import { h, showScreen, confirmDialog, toast, openModal } from '../ui.js';
+import { h, showScreen, confirmDialog, toast } from '../ui.js';
 import { emblem } from '../art.js';
 import { GAME_VERSION } from '../gameState.js';
 import * as game from '../game.js';
 import { openSettings } from './settingsModal.js';
+import { openHelp } from './helpModal.js';
 
 export function render() {
   const status = game.getSaveStatus();
@@ -39,13 +40,6 @@ export function render() {
     showScreen('title');
   };
 
-  const onHelp = () => openModal({
-    title: '도움말',
-    body: h('div', {},
-      h('p', {}, '《회색의 연대기》는 분리된 구역들을 탐사하며 사건과 전투를 겪고, 자신의 기록을 남기는 2D RPG입니다.'),
-      h('p', { class: 'text-dim' }, '현재 버전은 개발 1단계입니다. 사건, 판정, 전투 규칙은 이후 단계에서 추가되며, 추가될 때 이 도움말에도 설명이 들어갑니다.'),
-    ),
-  });
 
   return h('section', { class: 'screen title-screen' },
     emblem(),
@@ -63,7 +57,7 @@ export function render() {
       h('button', { class: 'btn btn--block', 'data-action': 'archive', disabled: true }, '기록실 (준비 중)'),
       h('div', { class: 'btn-row' },
         h('button', { class: 'btn', style: { flex: 1 }, 'data-action': 'settings', onClick: openSettings }, '설정'),
-        h('button', { class: 'btn', style: { flex: 1 }, 'data-action': 'help', onClick: onHelp }, '도움말'),
+        h('button', { class: 'btn', style: { flex: 1 }, 'data-action': 'help', onClick: openHelp }, '도움말'),
       ),
     ),
     h('p', { class: 'title-foot' }, `v${GAME_VERSION}`),

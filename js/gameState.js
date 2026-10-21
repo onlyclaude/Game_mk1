@@ -2,8 +2,8 @@
 // 화면 코드와 분리되어 있어 Node 테스트에서도 그대로 사용할 수 있다.
 import { STAT_IDS, BASE_STAT } from '../data/stats.js';
 
-export const GAME_VERSION = '0.1.0';
-export const SAVE_VERSION = 1;
+export const GAME_VERSION = '0.2.0';
+export const SAVE_VERSION = 2;
 
 export function createNewState({ name = '이름 없는 탐사자', origin = null, traits = [], stats = null } = {}) {
   const now = Date.now();
@@ -15,15 +15,20 @@ export function createNewState({ name = '이름 없는 탐사자', origin = null
       name,
       origin,
       traits: [...traits],
+      look: 'a',
       stats: { ...baseStats, ...(stats || {}) },
     },
     progress: {
       year: 1,
-      step: 0,
+      yearStep: 0,          // 올해 겪은 사건 수
+      step: 0,              // 전체 사건 수
       flags: {},
       choices: [],          // 주요 선택 기록 { eventId, choiceId, year }
       completedEvents: [],
       currentEventId: null,
+      lastEventId: null,
+      queue: [],            // 후속 사건 대기열
+      log: [],              // 최근 기록
     },
     resources: { credits: 30, supplies: 3 },
     party: { roster: [], active: [] },
