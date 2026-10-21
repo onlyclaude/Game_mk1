@@ -1,0 +1,26 @@
+/* 태블릿 가로 이상: 허브를 2단으로 */
+@media (min-width: 900px) {
+  .hub-grid { grid-template-columns: 1.2fr 1fr; }
+}
+
+/* 좁은 화면(휴대폰 세로) */
+@media (max-width: 480px) {
+  :root { --gap: 12px; }
+  .topbar { gap: 8px; }
+  .chip { padding: 4px 8px; font-size: 0.8rem; }
+}
+
+/* 높이가 낮은 가로 화면(태블릿/휴대폰 가로) */
+@media (max-height: 560px) and (orientation: landscape) {
+  .title-emblem { width: 56px; height: 56px; margin-bottom: 4px; }
+  .title-sub { margin-bottom: 16px; }
+  .title-foot { margin-top: 12px; }
+  .topbar { min-height: 52px; }
+}
+
+/* 마우스가 있는 기기에서만 hover 효과 (터치에서는 사용하지 않음) */
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover:not(:disabled) { border-color: var(--accent-2); }
+  .btn--primary:hover:not(:disabled) { filter: brightness(1.08); }
+  .choice:hover:not(:disabled) { background: rgba(95, 179, 168, 0.14); }
+}
